@@ -1,3 +1,19 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+
+# Configure the AWS Provider
+provider "aws" {
+  region = "us-east-1"
+}
+
+
+
 # NETWORK ARCHITECTURE
 
 #vpc
@@ -173,7 +189,7 @@ resource "aws_route_table_association" "private_rt_association_2" {
 # db subnet group
 resource "aws_db_subnet_group" "tf_db_subnet" {
   name       = "tf_db_subnet_group"
-  subnet_ids = [aws_subnet.private_subnet_2a , aws_subnet.public_subnet_2b]
+  subnet_ids = [aws_subnet.private_subnet_2a.id , aws_subnet.public_subnet_2b.id]
 
   tags = {
     Name = "tf_db_subnet_group"
@@ -190,6 +206,11 @@ resource "aws_db_instance" "rds_instance" {
   password             = "database#12345"
   db_subnet_group_name = aws_db_subnet_group.tf_db_subnet.name
   deletion_protection = false 
+  identifier = "tf-rds"
+  multi_az = false
+  vpc_security_group_ids = [ aws_security_group.rds_sg.id ]
+  skip_final_snapshot = true
+  
 
   tags = {
     Name = "tf_rds"
@@ -219,7 +240,7 @@ resource "aws_vpc_security_group_ingress_rule" "alb_ingress_1" {
 
 
 resource "aws_vpc_security_group_egress_rule" "alb_egress" {
-  security_group_id = aws_security_group.allow_tls.id
+  security_group_id = aws_security_group.alb_sg.id
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1" # semantically equivalent to all ports
 }
@@ -277,32 +298,32 @@ resource "aws_vpc_security_group_egress_rule" "rds_egress" {
 
 # ASG
 # launch template 
-resource "aws_launch_template" "launch_template" {
-  name = "tf_lt"
+# resource "aws_launch_template" "launch_template" {
+#   name = "tf_lt"
 
-  iam_instance_profile {
-    name = "ssm-role-test"
-  }
+#   iam_instance_profile {
+#     name = "ssm-role-test"
+#   }
 
-  image_id = "ami-083dedce92603a2ad"
+#   image_id = "ami-083dedce92603a2ad"
 
-  instance_initiated_shutdown_behavior = "terminate"
+#   instance_initiated_shutdown_behavior = "terminate"
 
-  instance_type = "t3.micro"
+#   instance_type = "t3.micro"
 
-  monitoring {
-    enabled = true
-  }
+#   monitoring {
+#     enabled = true
+#   }
 
-  vpc_security_group_ids = [aws_security_group.asg_sg]
+#   vpc_security_group_ids = [aws_security_group.asg_sg.id]
 
-  tag_specifications {
-    resource_type = "instance"
+#   tag_specifications {
+#     resource_type = "instance"
 
-    tags = {
-      Name = "tf_lt"
-    }
-  }
+#     tags = {
+#       Name = "tf_lt"
+#     }
+#   }
 
-  user_data = filebase64("${path.module}/example.sh")
-}
+#   user_data = filebase64("${path.module}/example.sh")
+# }

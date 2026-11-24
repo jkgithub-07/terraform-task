@@ -1,6 +1,6 @@
-##------------- Global Variable ---------------##
+# GLOBAL VARIABLES
 
-variable "region" {
+variable "region"{
     description = "region for resource deployment"
 }
 
@@ -8,24 +8,31 @@ variable "environment" {
     description = "environment for resource deployment"
 }
 
-##------------- VPC configuration variables -------------##
+variable "internet_cidr"{
+    description = "internet cidr"
+}
 
+# VPC VARIABLES
 variable "vpc_conf" {
     description = "configurations for vpc"
 }
 
-##-------------- RDS Configuration Variables --------------##
-
+# RDS VARIABLES
 variable "rds_conf" {
     description = "configurations for rds"
 }
 
+#SG VARIABLES
+variable "sg_conf" {
+  description = "configuration for security groups"
+}
 
-# resource "aws_vpc" "vpc" {
-#   cidr_block       = var.vpc_conf.cidr_block
-#   instance_tenancy = "default"
+#ASG VARIABLES
+variable "asg_conf" {
+  description = "autoscaling group variables"
+}
 
-#   tags = {
-#     Name = "dev_vpc"
-#   }
-# }
+#ALB VARIABLES
+variable "alb_conf" {
+  description = "alb configurations"
+}

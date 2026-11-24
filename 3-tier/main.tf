@@ -9,7 +9,7 @@ terraform {
 
 # Configure the AWS Provider
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
 
@@ -18,11 +18,11 @@ provider "aws" {
 
 #vpc
 resource "aws_vpc" "test_vpc" {
-  cidr_block       = "10.0.0.0/16"
+  cidr_block       = var.vpc_conf.cidr_block
   
 
   tags = {
-    Name = "tf_3_tier_vpc"
+    Name = var.vpc_conf.name
   }
 }
 
@@ -30,63 +30,63 @@ resource "aws_vpc" "test_vpc" {
 #public
 resource "aws_subnet" "public_subnet_1" {
   vpc_id     = aws_vpc.test_vpc.id   # required
-  cidr_block = "10.0.1.0/24"         # optional
-  availability_zone = "us-east-1a"   # optional 
+  cidr_block = var.vpc_conf.public_subnet_cidr_1         # optional
+  availability_zone = var.vpc_conf.az1   # optional 
 
   tags = {
-    Name = "public_subnet_1"
+    Name = "${var.vpc_conf.public_subnet_name}_1"
   }
 }
 
 resource "aws_subnet" "public_subnet_2" {
   vpc_id     = aws_vpc.test_vpc.id   # required
-  cidr_block = "10.0.2.0/24"         # optional
-  availability_zone = "us-east-1b"   # optional 
+  cidr_block =  var.vpc_conf.public_subnet_cidr_2        # optional
+  availability_zone = var.vpc_conf.az2   # optional 
 
   tags = {
-    Name = "public_subnet_2"
+    Name = "${var.vpc_conf.public_subnet_name}_2"
   }
 }
 
 #private(application tier)
 resource "aws_subnet" "private_subnet_1a" {
   vpc_id     = aws_vpc.test_vpc.id   # required
-  cidr_block = "10.0.3.0/24"         # optional
-  availability_zone = "us-east-1a"   # optional 
+  cidr_block = var.vpc_conf.private_subnet_cidr_1         # optional
+  availability_zone = var.vpc_conf.az1   # optional 
 
   tags = {
-    Name = "private_subnet_1a"
+    Name = "${var.vpc_conf.private_subnet_name}_1a"
   }
 }
 
 resource "aws_subnet" "private_subnet_1b" {
   vpc_id     = aws_vpc.test_vpc.id   # required
-  cidr_block = "10.0.4.0/24"         # optional
-  availability_zone = "us-east-1b"   # optional 
+  cidr_block = var.vpc_conf.private_subnet_cidr_2         # optional
+  availability_zone = var.vpc_conf.az2   # optional 
 
   tags = {
-    Name = "private_subnet_1b"
+    Name = "${var.vpc_conf.private_subnet_name}_1b"
   }
 }
 
 # private(db tier)
 resource "aws_subnet" "private_subnet_2a" {
   vpc_id     = aws_vpc.test_vpc.id   # required
-  cidr_block = "10.0.5.0/24"         # optional
-  availability_zone = "us-east-1a"   # optional 
+  cidr_block = var.vpc_conf.private_subnet_cidr_3        # optional
+  availability_zone = var.vpc_conf.az1   # optional 
 
   tags = {
-    Name = "private_subnet_2a"
+    Name = "${var.vpc_conf.private_subnet_name}_2a"
   }
 }
 
-resource "aws_subnet" "public_subnet_2b" {
+resource "aws_subnet" "private_subnet_2b" {
   vpc_id     = aws_vpc.test_vpc.id   # required
-  cidr_block = "10.0.6.0/24"         # optional
-  availability_zone = "us-east-1b"   # optional 
+  cidr_block = var.vpc_conf.private_subnet_cidr_4         # optional
+  availability_zone = var.vpc_conf.az2   # optional 
 
   tags = {
-    Name = "private_subnet_2b"
+    Name = "${var.vpc_conf.private_subnet_name}_2b"
   }
 }
 
@@ -96,7 +96,7 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.test_vpc.id
 
   tags = {
-    Name = "tf-igw"
+    Name = "${var.environment}_igw"
   }
 }
 
@@ -119,17 +119,17 @@ resource "aws_route_table" "public_rt" {
   vpc_id = aws_vpc.test_vpc.id
 
   route {
-    cidr_block = "0.0.0.0/0"  
+    cidr_block = var.vpc_conf.internet_cidr  
     gateway_id = aws_internet_gateway.igw.id
   }
 
   route {
-    cidr_block = "10.0.0.0/16"
-    gateway_id = "local"
+    cidr_block = var.vpc_conf.cidr_block
+    gateway_id = var.vpc_conf.local_route_gw_id
   }
 
   tags = {
-    Name = "tf_public_rt"
+    Name = "${var.environment}_public_rt"
   }
 }
 
@@ -148,10 +148,10 @@ resource "aws_route_table_association" "public_rt_association_2" {
 # public nat with auto mode(regional nat)
 resource "aws_nat_gateway" "nat" {
   vpc_id            = aws_vpc.test_vpc.id
-  availability_mode = "regional"
+  availability_mode = var.vpc_conf.nat_availability_mode
 
   tags = {
-    Name = "tf-nat"
+    Name = "${var.environment}-nat"
   }
 }
 
@@ -160,17 +160,17 @@ resource "aws_route_table" "private_rt" {
   vpc_id = aws_vpc.test_vpc.id
 
   route {
-    cidr_block = "0.0.0.0/0"  
+    cidr_block = var.vpc_conf.internet_cidr  
     gateway_id = aws_nat_gateway.nat.id
   }
 
   route {
-    cidr_block = "10.0.0.0/16"
-    gateway_id = "local"
+    cidr_block = var.vpc_conf.cidr_block
+    gateway_id = var.vpc_conf.local_route_gw_id
   }
 
   tags = {
-    Name = "tf_private_rt"
+    Name = "${var.environment}_private_rt"
   }
 }
 
@@ -188,32 +188,32 @@ resource "aws_route_table_association" "private_rt_association_2" {
 ## RDS
 # db subnet group
 resource "aws_db_subnet_group" "tf_db_subnet" {
-  name       = "tf_db_subnet_group"
-  subnet_ids = [aws_subnet.private_subnet_2a.id , aws_subnet.public_subnet_2b.id]
+  name       = "${var.environment}_${var.rds_conf.db_subnet_name}"
+  subnet_ids = [aws_subnet.private_subnet_2a.id , aws_subnet.private_subnet_2b.id]
 
   tags = {
-    Name = "tf_db_subnet_group"
+    Name = "${var.environment}_${var.rds_conf.db_subnet_name}"
   }
 }
 
 resource "aws_db_instance" "rds_instance" {
-  allocated_storage    = 8
-  db_name              = "tf_mydb"
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t3.micro"   # required 
-  username             = "admin"
-  password             = "database#12345"
+  allocated_storage    = var.rds_conf.allocated_storage
+  db_name              = var.rds_conf.db_name
+  engine               = var.rds_conf.engine
+  engine_version       = var.rds_conf.engine_version
+  instance_class       = var.rds_conf.instance_class   # required 
+  username             = var.rds_conf.username
+  password             = var.rds_conf.password
   db_subnet_group_name = aws_db_subnet_group.tf_db_subnet.name
-  deletion_protection = false 
-  identifier = "tf-rds"
-  multi_az = false
+  deletion_protection = var.rds_conf.deletion_protection
+  identifier = var.rds_conf.identifier
+  multi_az = var.rds_conf.multi_az
   vpc_security_group_ids = [ aws_security_group.rds_sg.id ]
-  skip_final_snapshot = true
+  skip_final_snapshot = var.rds_conf.skip_final_snapshot
   
 
   tags = {
-    Name = "tf_rds"
+    Name = "${var.environment}_rds"
   }
 
 }
@@ -221,109 +221,169 @@ resource "aws_db_instance" "rds_instance" {
 # SECURITY GROUPS (ALB , ASG , RDS)
 # ALB 
 resource "aws_security_group" "alb_sg" {
-  name        = "tf_alb_sg"
-  description = "Allow inbound traffic and all outbound traffic"
+  name        = "${var.environment}_alb_sg"
+  description = var.sg_conf.desc
   vpc_id      = aws_vpc.test_vpc.id
 
   tags = {
-    Name = "tf_alb_sg"
+    Name = "${var.environment}_alb_sg_alb_sg"
   }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "alb_ingress_1" {
   security_group_id = aws_security_group.alb_sg.id
-  cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
+  cidr_ipv4         = var.internet_cidr
+  from_port         = var.sg_conf.alb_from_port
+  ip_protocol       = var.sg_conf.ip_protocol
+  to_port           = var.sg_conf.alb_to_port
 }
 
 
 resource "aws_vpc_security_group_egress_rule" "alb_egress" {
   security_group_id = aws_security_group.alb_sg.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "-1" # semantically equivalent to all ports
+  cidr_ipv4         = var.internet_cidr
+  ip_protocol       = var.sg_conf.all_ports # semantically equivalent to all ports
 }
 
 # ASG
 resource "aws_security_group" "asg_sg" {
-  name        = "tf_asg_sg"
-  description = "Allow inbound traffic and all outbound traffic"
+  name        = "${var.environment}_asg_sg"
+  description = var.sg_conf.desc
   vpc_id      = aws_vpc.test_vpc.id
 
   tags = {
-    Name = "tf_asg_sg"
+    Name = "${var.environment}_asg_sg"
   }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "asg_ingress_1" {
   security_group_id = aws_security_group.asg_sg.id
   referenced_security_group_id = aws_security_group.alb_sg.id  #  (Optional) Source security group that is referenced in the rule.
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
+  from_port         = var.sg_conf.asg_from_port
+  ip_protocol       = var.sg_conf.ip_protocol
+  to_port           = var.sg_conf.asg_to_port
 }
 
 
 resource "aws_vpc_security_group_egress_rule" "asg_egress" {
   security_group_id = aws_security_group.asg_sg.id
-  cidr_ipv4         = "0.0.0.0/0"
-  ip_protocol       = "-1" # semantically equivalent to all ports
+  cidr_ipv4         = var.internet_cidr
+  ip_protocol       = var.sg_conf.all_ports # semantically equivalent to all ports
 }
 
 # RDS
 resource "aws_security_group" "rds_sg" {
-  name        = "tf_rds_sg"
-  description = "Allow inbound traffic and all outbound traffic"
+  name        = "${var.environment}_rds_sg"
+  description = var.sg_conf.desc
   vpc_id      = aws_vpc.test_vpc.id
 
   tags = {
-    Name = "tf_rds_sg"
+    Name = "${var.environment}_rds_sg"
   }
 }
 
 resource "aws_vpc_security_group_ingress_rule" "rds_ingress_1" {
   security_group_id = aws_security_group.rds_sg.id
   referenced_security_group_id = aws_security_group.asg_sg.id
-  from_port         = 3306
-  ip_protocol       = "tcp"
-  to_port           = 3306
+  from_port         = var.sg_conf.rds_from_port
+  ip_protocol       = var.sg_conf.ip_protocol
+  to_port           = var.sg_conf.rds_to_port
 }
 
 resource "aws_vpc_security_group_egress_rule" "rds_egress" {
   security_group_id = aws_security_group.rds_sg.id
   referenced_security_group_id = aws_security_group.asg_sg.id
-  ip_protocol       = "-1" # semantically equivalent to all ports
+  ip_protocol       = var.sg_conf.all_ports # semantically equivalent to all ports
+}
+
+#IAM ROLE FOR ASG
+resource "aws_iam_role" "ec2_role"{
+  name = "ec2-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = ""
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "role_policy_attachment" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "ec2-instance-profile"
+  role = aws_iam_role.ec2_role.name
 }
 
 # ASG
 # launch template 
-# resource "aws_launch_template" "launch_template" {
-#   name = "tf_lt"
+resource "aws_launch_template" "launch_template" {
+  name = "${var.environment}_lt"
 
-#   iam_instance_profile {
-#     name = "ssm-role-test"
-#   }
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
 
-#   image_id = "ami-083dedce92603a2ad"
+  image_id = var.asg_conf.image_id
+  instance_initiated_shutdown_behavior = var.asg_conf.instance_initiated_shutdown_behavior
+  instance_type = var.asg_conf.instance_type
+  vpc_security_group_ids = [aws_security_group.asg_sg.id]
+  user_data = filebase64("${path.module}/user_data.sh")
+}
 
-#   instance_initiated_shutdown_behavior = "terminate"
+# asg creation 
+resource "aws_autoscaling_group" "tf_asg" {
+  desired_capacity   = var.asg_conf.desired_capacity
+  max_size           = var.asg_conf.max_size
+  min_size           = var.asg_conf.min_size
+  vpc_zone_identifier = [aws_subnet.private_subnet_1a.id, aws_subnet.private_subnet_1b.id]
+  #  Subnets automatically determine which availability zones the group will reside
 
-#   instance_type = "t3.micro"
+  launch_template {
+    id      = aws_launch_template.launch_template.id
+    version = var.asg_conf.launch_template_version
+  }
 
-#   monitoring {
-#     enabled = true
-#   }
+  target_group_arns = [ aws_lb_target_group.tg_1.arn ]
+}
 
-#   vpc_security_group_ids = [aws_security_group.asg_sg.id]
+# alb creation
+resource "aws_lb_target_group" "tg_1" {
+  name     = "${var.environment}-tg-1"
+  port     = var.alb_conf.tg_port
+  protocol = var.alb_conf.tg_protocol
+  vpc_id   = aws_vpc.test_vpc.id
+}
 
-#   tag_specifications {
-#     resource_type = "instance"
 
-#     tags = {
-#       Name = "tf_lt"
-#     }
-#   }
+resource "aws_lb" "alb" {
+  name               = "${var.environment}-lb"
+  internal           = var.alb_conf.internal
+  load_balancer_type = var.alb_conf.load_balancer_type
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = [aws_subnet.public_subnet_1.id , aws_subnet.public_subnet_2.id]
 
-#   user_data = filebase64("${path.module}/example.sh")
-# }
+  enable_deletion_protection = var.alb_conf.enable_deletion_protection
+
+}
+
+resource "aws_lb_listener" "alb_listener" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = var.alb_conf.listener_port
+  protocol          = var.alb_conf.listener_protocol
+
+  default_action {
+    type             = var.alb_conf.listener_default_action_type
+    target_group_arn = aws_lb_target_group.tg_1.arn
+  }
+}
+

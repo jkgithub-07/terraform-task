@@ -64,6 +64,8 @@ asg_conf = {
     image_id = "ami-0aacbf72109c53c0c"
     instance_initiated_shutdown_behavior = "terminate"
     instance_type = "t3.micro"
+    policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    instance_profile_name = "ec2-ssm-role-profile-tf"
 
     desired_capacity   = 1
     max_size           = 1
